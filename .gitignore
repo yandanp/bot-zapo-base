@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+
+# auth / session state (SQLite store + any temp files)
+.auth/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# env
+.env
+
+# logs
+logs/
+*.log
+
+# os / editor
+.DS_Store
+.vscode/
+.idea/
