@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "WhatsApp bot built on zapo-js (ESM, plain JS) with socket, upsert, reconnect, and a ping plugin.",
   "type": "module",
-  "main": "src/index.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "start": "node index.js",
+    "dev": "node --watch index.js"
   },
   "engines": {
     "node": ">=20.9.0"

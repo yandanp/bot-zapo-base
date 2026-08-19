@@ -12,14 +12,18 @@
  */
 import 'dotenv/config'
 import qrcode from 'qrcode-terminal'
-import { createLogger } from './logger.js'
-import { createSocket } from './socket.js'
-import { attachReconnect } from './reconnect.js'
+import { createLogger } from './lib/logger.js'
+import { createSocket } from './lib/socket.js'
+import { attachReconnect } from './lib/reconnect.js'
 import { loadPlugins } from './plugins/loader.js'
 
 async function main() {
   const logger = await createLogger()
   const client = createSocket({ logger })
+
+  // Decide pairing mode up-front so handlers can branch on it.
+  const pairingPhone = process.env.PAIRING_PHONE?.trim()
+  const usePairingCode = pairingPhone.length > 0
 
   // ── Pairing / connection observability ──────────────────────────
   client.on('connection', (event) => {
@@ -27,7 +31,8 @@ async function main() {
   })
 
   client.on('auth_qr', ({ qr, ttlMs }) => {
-    // Render the pairing QR as an ASCII matrix that can actually be scanned.
+    // In pairing-code mode the QR is just a readiness signal — don't render it.
+    if (usePairingCode) return
     console.log('\n────────────── scan this QR ──────────────')
     qrcode.generate(qr, { small: true }, (ascii) => {
       console.log(ascii)
@@ -37,7 +42,12 @@ async function main() {
   })
 
   client.on('auth_pairing_code', ({ code }) => {
-    logger.info({ code }, 'pairing code — enter it on the phone')
+    const pretty = code.match(/.{1,4}/g)?.join('-') ?? code
+    console.log('\n────────────── pairing code ──────────────')
+    console.log(`  ${pretty}`)
+    console.log('enter this on your phone:')
+    console.log('  Settings → Linked devices → Link with phone number')
+    console.log('──────────────────────────────────────────\n')
   })
 
   client.on('auth_paired', ({ credentials }) => {
@@ -70,20 +80,23 @@ async function main() {
   process.on('SIGINT', () => void shutdown(0))
   process.on('SIGTERM', () => void shutdown(0))
 
-  // ── Connect: QR flow (default) or link-code flow ────────────────
-  const pairingPhone = process.env.PAIRING_PHONE?.trim()
+  // ── Connect ─────────────────────────────────────────────────────
   try {
-    if (pairingPhone) {
+    if (usePairingCode) {
       // Link-code flow: fire connect() without awaiting, wait for the
-      // server to signal it's ready, then request the 8-digit code.
+      // server to signal readiness (auth_pairing_required OR auth_qr —
+      // either means the server is ready to receive a pairing code), then
+      // request the 8-digit code.
       logger.info({ phone: pairingPhone }, 'link-mode: pairing-code flow')
       const connectPromise = client.connect()
-      await new Promise((resolve) => client.once('auth_pairing_required', resolve))
-      const code = await client.auth.requestPairingCode(pairingPhone)
-      logger.info(
-        { code },
-        'link-code: enter this 8-digit code on your phone (Settings → Linked devices → Link with phone number)'
-      )
+      const readyPromise = new Promise((resolve) => {
+        client.once('auth_pairing_required', () => resolve('pairing_required'))
+        client.once('auth_qr', () => resolve('qr'))
+      })
+      await readyPromise
+      logger.info('pairing screen ready — requesting link code')
+      await client.auth.requestPairingCode(pairingPhone)
+      // The code is printed by the auth_pairing_code handler above.
       await connectPromise
     } else {
       // QR flow (default).

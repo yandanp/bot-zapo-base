@@ -9,11 +9,11 @@ This project is **plain JavaScript + ESM** (`"type": "module"`), no TypeScript b
 
 | Concern | File | Notes |
 |---|---|---|
-| **create socket** | `src/socket.js` | Builds a `WaClient` over the store and calls `client.connect()`. zapo owns the WebSocket, noise handshake, keep-alive and resume internally. |
-| **upsert** | `src/store.js` | SQLite-backed persistent store. Credentials, Signal keys, contacts, threads and the message archive are upserted (`INSERT ... ON CONFLICT DO UPDATE`) so a restart reuses the existing pairing. |
-| **reconnect** | `src/reconnect.js` | Supervisor that listens for `connection: { status: 'close' }` and calls `client.connect()` again, skipping logouts and backing off between attempts. |
-| **plugin: ping** | `src/plugins/ping.js` | Replies `pong` to `ping` / `!ping`. |
-| **plugin loader** | `src/plugins/loader.js` | Auto-loads every `.js` file in `src/plugins/`. |
+| **create socket** | `socket.js` | Builds a `WaClient` over the store and calls `client.connect()`. zapo owns the WebSocket, noise handshake, keep-alive and resume internally. |
+| **upsert** | `store.js` | SQLite-backed persistent store. Credentials, Signal keys, contacts, threads and the message archive are upserted (`INSERT ... ON CONFLICT DO UPDATE`) so a restart reuses the existing pairing. |
+| **reconnect** | `reconnect.js` | Supervisor that listens for `connection: { status: 'close' }` and calls `client.connect()` again, skipping logouts and backing off between attempts. |
+| **plugin: ping** | `plugins/ping.js` | Replies `pong` to `ping` / `!ping`. |
+| **plugin loader** | `plugins/loader.js` | Auto-loads every `.js` file in `plugins/`. |
 
 ## Project structure
 
@@ -21,15 +21,17 @@ This project is **plain JavaScript + ESM** (`"type": "module"`), no TypeScript b
 bot-zapo/
 ├── package.json          # type: module, dependencies
 ├── .env.example          # copy to .env and edit
-├── src/
-│   ├── index.js          # entry point
+├── index.js              # entry point
+├── README.md
+├── .gitignore
+├── lib/
 │   ├── logger.js         # pino / console logger
 │   ├── socket.js         # create socket (WaClient + connect)
 │   ├── store.js          # upsert layer (SQLite store)
-│   ├── reconnect.js      # reconnect supervisor
-│   └── plugins/
-│       ├── loader.js     # auto plugin loader
-│       └── ping.js       # the ping plugin
+│   └── reconnect.js      # reconnect supervisor
+├── plugins/
+│   ├── loader.js         # auto plugin loader
+│   └── ping.js           # the ping plugin
 └── .auth/                # (gitignored) SQLite auth / session state
 ```
 
@@ -80,11 +82,11 @@ Everything is driven by `.env` (see `.env.example`):
 
 ## Adding a new plugin
 
-Drop a new file into `src/plugins/`, default-export a function, and it loads
+Drop a new file into `plugins/`, default-export a function, and it loads
 automatically on startup:
 
 ```js
-// src/plugins/hello.js
+// plugins/hello.js
 export default function helloPlugin({ client, logger, config }) {
   client.on('message', async (event) => {
     if (event.key?.fromMe) return
