@@ -22,7 +22,7 @@ async function main() {
   const client = createSocket({ logger })
 
   // Decide pairing mode up-front so handlers can branch on it.
-  const pairingPhone = process.env.PAIRING_PHONE?.trim()
+  const pairingPhone = process.env.PAIRING_PHONE?.trim() ?? ''
   const usePairingCode = pairingPhone.length > 0
 
   // ── Pairing / connection observability ──────────────────────────

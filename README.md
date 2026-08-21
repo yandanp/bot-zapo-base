@@ -91,6 +91,58 @@ lookup, including quoting messages that are no longer available in memory or
 after a restart. Quote replies are not globally automatic: each plugin must
 explicitly pass `{ quote: event }` when sending its response.
 
+## Private messaging base layer
+
+The `lib/` folder ships a generic, game-agnostic foundation for sending private
+messages. This is what a future game plugin (cards, secrets, DMs, tokens) will
+build on top of — the base itself contains no game logic.
+
+```
+lib/
+├── registry.js          # global, persistent user registry (SQLite)
+├── private-message.js   # send to one or many private chats, safely
+└── group-players.js     # resolve registered members of a group
+```
+
+Bot-owned data lives in `.data/bot.sqlite` (override via `BOT_DB`), which is a
+separate database from zapo's auth store (`.auth/state.sqlite`). Registration is
+global: register once, and the user is considered registered everywhere.
+
+Typical usage inside a plugin:
+
+```js
+import { registerFromMessage, findByJid } from '../lib/registry.js'
+import { sendPrivateMessage, sendPrivateBatch } from '../lib/private-message.js'
+
+// 1. Register the sender (call once, e.g. in a register command handler)
+registerFromMessage(event)
+
+// 2. Send a private DM to a single user
+await sendPrivateMessage({
+  client,
+  to: user.jid,
+  content: { type: 'text', text: 'Here is your secret message.' }
+})
+
+// 3. Fan out to a group of registered players (throttled, per-user results)
+const { sent, failed } = await sendPrivateBatch({
+  client,
+  recipients: players.map((p) => ({
+    jid: p.privateJid,
+    content: { type: 'text', text: 'Your cards: …' }
+  }))
+})
+```
+
+The `sendPrivateMessage` guard refuses to send to a group JID by accident, and
+`sendPrivateBatch` returns `{ sent, failed }` so callers can react per recipient.
+
+Run the base validation suite:
+
+```bash
+node tests/validate-private-base.js
+```
+
 ## Config
 
 Everything is driven by `.env` (see `.env.example`):
@@ -99,6 +151,7 @@ Everything is driven by `.env` (see `.env.example`):
 |---|---|---|
 | `SESSION_ID` | `default` | Session id (multi-session support) |
 | `AUTH_PATH` | `.auth/state.sqlite` | SQLite auth/state file |
+| `BOT_DB` | `.data/bot.sqlite` | Bot database (player registry) path |
 | `STORE_MESSAGES` | `none` | `none` = real-time only, `sqlite` = archive all messages |
 | `LOG_LEVEL` | `info` | `trace`/`debug`/`info`/`warn`/`error` |
 | `PREFIX` | `!` | Command prefix, for example `!ping`, `.ping`, or `#ping` |
