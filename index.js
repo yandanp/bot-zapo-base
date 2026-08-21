@@ -7,7 +7,7 @@
  *   3. pairing observability handlers (QR renderer / pairing-code / paired)
  *   4. reconnect supervisor attached before connect() so close events fire
  *      on a supervisor that's already listening
- *   5. plugins loaded (ping, and any future plugins dropped into src/plugins/)
+ *   5. plugins loaded (ping, and any future plugins dropped into plugins/)
  *   6. connect() — QR flow by default, or link-code flow if PAIRING_PHONE set
  */
 import 'dotenv/config'
@@ -67,7 +67,7 @@ async function main() {
   const loaded = await loadPlugins({
     client,
     logger,
-    config: { prefix: '!' }
+    config: { prefix: process.env.PREFIX?.trim() || '!' }
   })
   logger.info({ loaded }, 'plugins ready')
 

@@ -9,10 +9,10 @@ This project is **plain JavaScript + ESM** (`"type": "module"`), no TypeScript b
 
 | Concern | File | Notes |
 |---|---|---|
-| **create socket** | `socket.js` | Builds a `WaClient` over the store and calls `client.connect()`. zapo owns the WebSocket, noise handshake, keep-alive and resume internally. |
-| **upsert** | `store.js` | SQLite-backed persistent store. Credentials, Signal keys, contacts, threads and the message archive are upserted (`INSERT ... ON CONFLICT DO UPDATE`) so a restart reuses the existing pairing. |
-| **reconnect** | `reconnect.js` | Supervisor that listens for `connection: { status: 'close' }` and calls `client.connect()` again, skipping logouts and backing off between attempts. |
-| **plugin: ping** | `plugins/ping.js` | Replies `pong` to `ping` / `!ping`. |
+| **create socket** | `lib/socket.js` | Builds a `WaClient` over the store and calls `client.connect()`. zapo owns the WebSocket, noise handshake, keep-alive and resume internally. |
+| **upsert** | `lib/store.js` | SQLite-backed persistent store. Credentials, Signal keys, contacts and threads are upserted (`INSERT ... ON CONFLICT DO UPDATE`) so a restart reuses the existing pairing. Messages are real-time only by default (`STORE_MESSAGES=none`); set `STORE_MESSAGES=sqlite` to archive them. |
+| **reconnect** | `lib/reconnect.js` | Supervisor that listens for `connection: { status: 'close' }` and calls `client.connect()` again, skipping logouts and backing off between attempts. |
+| **plugin: ping** | `plugins/ping.js` | Replies `pong` to `ping` / prefixed `ping`, quoting the incoming command. |
 | **plugin loader** | `plugins/loader.js` | Auto-loads every `.js` file in `plugins/`. |
 
 ## Project structure
@@ -63,7 +63,33 @@ without a new QR scan.
 > **Tip:** if you can't scan a QR, set `PAIRING_PHONE=<phone number>` in `.env`
 > to use the 8-digit pairing-code flow instead.
 
-Send the bot `ping` (or `!ping`) and it replies `pong 🏓`.
+Send the bot `ping` (or the configured prefix followed by `ping`, such as
+`!ping`) and it replies `pong 🏓` while quoting the incoming command.
+
+## Message storage and quote replies
+
+Message archiving is disabled by default:
+
+```env
+STORE_MESSAGES=none
+```
+
+Incoming and outgoing messages are still processed in real time, but their
+contents are not archived in SQLite. The ping plugin can still quote/reply to
+the command because it passes the live incoming event directly:
+
+```js
+await client.message.send(
+  to,
+  { type: 'text', text: 'pong 🏓' },
+  { quote: event }
+)
+```
+
+Set `STORE_MESSAGES=sqlite` only when archived messages are needed for later
+lookup, including quoting messages that are no longer available in memory or
+after a restart. Quote replies are not globally automatic: each plugin must
+explicitly pass `{ quote: event }` when sending its response.
 
 ## Config
 
@@ -73,7 +99,9 @@ Everything is driven by `.env` (see `.env.example`):
 |---|---|---|
 | `SESSION_ID` | `default` | Session id (multi-session support) |
 | `AUTH_PATH` | `.auth/state.sqlite` | SQLite auth/state file |
+| `STORE_MESSAGES` | `none` | `none` = real-time only, `sqlite` = archive all messages |
 | `LOG_LEVEL` | `info` | `trace`/`debug`/`info`/`warn`/`error` |
+| `PREFIX` | `!` | Command prefix, for example `!ping`, `.ping`, or `#ping` |
 | `RECONNECT_DELAY_MS` | `2000` | Delay between reconnect attempts |
 | `RECONNECT_MAX_ATTEMPTS` | `0` | `0` = retry forever |
 | `DEVICE_BROWSER` | `Chrome` | Cosmetic device name |
@@ -102,7 +130,7 @@ export default function helloPlugin({ client, logger, config }) {
 
 zapo-js does **not** auto-reconnect. It emits `connection: { status: 'close' }`
 and expects you to call `client.connect()` again — which is exactly what
-`src/reconnect.js` does. When `isLogout` is true the supervisor deliberately does
+`lib/reconnect.js` does. When `isLogout` is true the supervisor deliberately does
 *not* retry, because the credential was unlinked and reconnecting would fail-loop.
 
 ## Requirements

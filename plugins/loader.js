@@ -1,7 +1,7 @@
 /**
  * PLUGIN LOADER.
  *
- * Every file in `src/plugins/` (except this one) is expected to default-export
+ * Every file in `plugins/` (except this one) is expected to default-export
  * a plugin function. A plugin receives a `ctx` object and registers whatever
  * handlers / commands it needs on the client.
  *
@@ -19,9 +19,8 @@
  * dropping a new file into this folder — no changes to the entry point needed.
  */
 import { readdirSync } from 'node:fs'
-import { join, extname } from 'node:path'
+import { dirname, extname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { dirname } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 

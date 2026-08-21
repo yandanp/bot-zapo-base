@@ -27,10 +27,18 @@ export default function pingPlugin(ctx) {
       event.timestampSeconds === undefined ? 0 : nowSeconds - event.timestampSeconds
 
     try {
-      await client.message.send(to, {
-        type: 'text',
-        text: `pong 🏓\nlatency: ${delta.toFixed(3)}s`
-      })
+      await client.message.send(
+        to,
+        {
+          type: 'text',
+          text: `pong 🏓\nlatency: ${delta.toFixed(3)}s`
+        },
+        {
+          // Quote the command event directly from memory. This still works
+          // when STORE_MESSAGES=none because no database lookup is needed.
+          quote: event
+        }
+      )
       logger.debug({ from: to, delta }, 'ping → pong')
     } catch (error) {
       logger.error({ to, message: error?.message }, 'failed to send pong')
